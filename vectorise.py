@@ -7,6 +7,7 @@ import sys
 from collections import Counter
 
 import cv2
+import nmslib
 import numpy as np
 
 SEPARATOR_MULTIPLIER = 100
@@ -57,7 +58,6 @@ def generate_features(extractor, images, fd):
     targets = np.asarray(targets, np.uint16)
 
     np.savez(fd, descriptors=descriptors, targets=targets)
-    fd.seek(0)
 
 
 def load_features(extractor, images, filename):
@@ -66,9 +66,7 @@ def load_features(extractor, images, filename):
             generate_features(extractor, images, fd)
 
     with open(filename, "rb") as fd:
-        data = np.load(fd)
-
-    print(data)
+        return np.load(fd)
 
 
 def main():
