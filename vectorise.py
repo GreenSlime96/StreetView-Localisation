@@ -37,7 +37,7 @@ def load_images(directory):
         sys.exit('not a directory: {}'.format(directory))
 
 
-def generate_features(extractor, images, filename):
+def generate_features(extractor, images, fd):
     descriptors = []
     targets = []
 
@@ -56,17 +56,17 @@ def generate_features(extractor, images, filename):
     descriptors = np.asarray(descriptors, np.uint8)
     targets = np.asarray(targets, np.uint16)
 
-    np.savez(filename, descriptors=descriptors, targets=targets)
-
-    return {'descriptors': descriptors, 'targets': target}
+    np.savez(fd, descriptors=descriptors, targets=targets)
+    fd.seek(0)
 
 
 def load_features(extractor, images, filename):
+    if not os.path.isfile(filename):
+        with open(filename, "wb") as fd:
+            generate_features(extractor, images, fd)
 
-    if os.path.isfile(filename):
-        data = np.load(filename)
-    else:
-        data = generate_features(extractor, images, filename)
+    with open(filename, "rb") as fd:
+        data = np.load(fd)
 
     print(data)
 
@@ -86,7 +86,7 @@ def main():
         sys.exit('image-coordinate map not consistent')
 
     sift = cv2.xfeatures2d.SIFT_create()
-    data = load_features(sift, images, args.features)
+    data = load_features(sift, images[:10], args.features)
 
     # try:
     #     data = np.load('data.npz')
@@ -162,3 +162,4 @@ save features?
 
 if __name__ == "__main__":
     main()
+
