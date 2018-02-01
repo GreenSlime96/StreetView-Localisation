@@ -86,31 +86,7 @@ def main():
     sift = cv2.xfeatures2d.SIFT_create()
     data = load_features(sift, images, args.features)
 
-    # try:
-    #     data = np.load('data.npz')
 
-    #     print('loaded SIFT features')
-
-    #     descriptors = data['descriptors']
-    #     target = data['target']
-    # except IOError:
-
-    # print('generating SIFT features')
-
-    # descriptors = []
-    # target = []
-
-    # for i in range(len(files)):
-    #     fd = files[i]
-
-    #     if i % 100 == 0:
-    #         print(i)
-
-    #     image = cv2.imread(fd, cv2.IMREAD_GRAYSCALE)
-    #     kp, des = sift.detectAndCompute(image, None)
-
-    #     target.extend([i] * len(des))
-    #     descriptors.extend(des)
 
 """
 TODO: prune function
@@ -118,13 +94,6 @@ polish pipeline
 save features?
 """
 
-# print('generating FLANN tree')
-
-# #     print('saving SIFT features')
-
-# #     np.savez_compressed('data', descriptors=descriptors, target=target)
-# # finally:
-# #     data.close()
 
 # FLANN_INDEX_KDTREE = 1
 # index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
