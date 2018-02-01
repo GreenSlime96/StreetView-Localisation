@@ -86,7 +86,7 @@ def main():
         sys.exit('image-coordinate map not consistent')
 
     sift = cv2.xfeatures2d.SIFT_create()
-    data = load_features(sift, images[:10], args.features)
+    data = load_features(sift, images, args.features)
 
     # try:
     #     data = np.load('data.npz')
