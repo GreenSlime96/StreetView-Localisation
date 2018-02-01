@@ -9,13 +9,16 @@ from collections import Counter
 import cv2
 import numpy as np
 
+SEPARATOR_MULTIPLIER = 100
 
-def name_sort(name):
-    filename = name.split('/')[-1]
-    split = filename.split('_')
-    value = int(split[0]) * 10 + int(split[1][0])
+def name_hash(filename):
+    filename = os.path.basename(filename)
+    split = os.path.splitext(filename)[0].split('_')
 
-    return value
+    if len(split) != 2:
+        sys.exit('unrecognised format: {}'.format(filename))
+
+    return int(split[0]) * SEPARATOR_MULTIPLIER + int(split[1][0])
 
 
 def build_coordinate_map(filename):
@@ -23,21 +26,67 @@ def build_coordinate_map(filename):
         with open(filename) as fd:
             return fd.read().splitlines()
     else:
-        sys.exit('invalid coordinates file: {}'.format(filename))
+        sys.exit('not a file: {}'.format(filename))
+
+
+def load_images(directory):
+    if os.path.isdir(directory):
+        files = glob.glob(os.path.join(directory, '*.jpg'))
+        return sorted(files, key=name_hash)
+    else:
+        sys.exit('not a directory: {}'.format(directory))
+
+
+def generate_features(extractor, images, filename):
+    descriptors = []
+    targets = []
+
+    for i in range(len(images)):
+        image = images[i]
+
+        if i % 100 == 0:
+            print('Images processed: {}'.format(i))
+
+        image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
+        kp, des = extractor.detectAndCompute(image, None)
+
+        targets.extend([i] * len(des))
+        descriptors.extend(des)
+
+    descriptors = np.asarray(descriptors, np.uint8)
+    targets = np.asarray(targets, np.uint16)
+
+    np.savez(filename, descriptors=descriptors, targets=targets)
+
+    return {'descriptors': descriptors, 'targets': target}
+
+
+def load_features(extractor, images, filename):
+
+    if os.path.isfile(filename):
+        data = np.load(filename)
+    else:
+        data = generate_features(extractor, images, filename)
+
+    print(data)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('coordinates', type=os.path.isfile, help='image-coordinate map')
+    parser.add_argument('coordinates', type=str, help='image-coordinate map')
     parser.add_argument('images', type=str, help='Street View image directory')
     parser.add_argument('features', type=str, help='precomputed SIFT features')
     args = parser.parse_args()
 
     coordinates = build_coordinate_map(args.coordinates)
-    images = None
+    images = load_images(args.images)
 
-    files = sorted(glob.glob('cache/*.jpg'), key=name_sort)
+    # Perform a length-check to enforce consistency
+    if len(images) % len(coordinates) != 0:
+        sys.exit('image-coordinate map not consistent')
+
     sift = cv2.xfeatures2d.SIFT_create()
+    data = load_features(sift, images, args.features)
 
     # try:
     #     data = np.load('data.npz')
@@ -48,25 +97,22 @@ def main():
     #     target = data['target']
     # except IOError:
 
-    print('generating SIFT features')
+    # print('generating SIFT features')
 
-    descriptors = []
-    target = []
+    # descriptors = []
+    # target = []
 
-    for i in range(len(files)):
-        fd = files[i]
+    # for i in range(len(files)):
+    #     fd = files[i]
 
-        if i % 100 == 0:
-            print(i)
+    #     if i % 100 == 0:
+    #         print(i)
 
-        image = cv2.imread(fd, cv2.IMREAD_GRAYSCALE)
-        kp, des = sift.detectAndCompute(image, None)
+    #     image = cv2.imread(fd, cv2.IMREAD_GRAYSCALE)
+    #     kp, des = sift.detectAndCompute(image, None)
 
-        target.extend([i] * len(des))
-        descriptors.extend(des)
-
-    descriptors = np.asarray(descriptors, np.uint8)
-    target = np.asarray(target, np.uint16)
+    #     target.extend([i] * len(des))
+    #     descriptors.extend(des)
 
 """
 TODO: prune function
