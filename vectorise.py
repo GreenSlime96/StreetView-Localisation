@@ -1,90 +1,56 @@
 import argparse
 import os
-import glob
-import random
-import sys
-
-from collections import Counter
 
 import cv2
-import nmslib
 import numpy as np
 
-SEPARATOR_MULTIPLIER = 100
-
-def name_hash(filename):
-    filename = os.path.basename(filename)
-    split = os.path.splitext(filename)[0].split('_')
-
-    if len(split) != 2:
-        sys.exit('unrecognised format: {}'.format(filename))
-
-    return int(split[0]) * SEPARATOR_MULTIPLIER + int(split[1][0])
+from util import load_coordinates, load_images
 
 
-def build_coordinate_map(filename):
-    if os.path.isfile(filename):
-        with open(filename) as fd:
-            return fd.read().splitlines()
-    else:
-        sys.exit('not a file: {}'.format(filename))
+def build_features(extractor, images, filename):
+    descfile = filename + '_desc'
+    targfile = filename + '_targ'
 
+    if os.path.isfile(descfile) or os.path.isfile(targfile):
+        sys.exit('filename in use: {}'.format(filename))
 
-def load_images(directory):
-    if os.path.isdir(directory):
-        files = glob.glob(os.path.join(directory, '*.jpg'))
-        return sorted(files, key=name_hash)
-    else:
-        sys.exit('not a directory: {}'.format(directory))
-
-
-def generate_features(extractor, images, fd):
-    descriptors = []
-    targets = []
+    desc = []
+    targ = []
 
     for i in range(len(images)):
-        image = images[i]
+        image = cv2.imread(images[i], cv2.IMREAD_GRAYSCALE)
+        kp, des = extractor.detectAndCompute(image, None)
+
+        targ.extend([i] * len(des))
+        desc.extend(des)
 
         if i % 100 == 0:
             print('Images processed: {}'.format(i))
 
-        image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-        kp, des = extractor.detectAndCompute(image, None)
+    with open(descfile, "wb") as fd:
+        np.save(fd, np.asarray(desc, np.uint8))
 
-        targets.extend([i] * len(des))
-        descriptors.extend(des)
-
-    descriptors = np.asarray(descriptors, np.uint8)
-    targets = np.asarray(targets, np.uint16)
-
-    np.savez(fd, descriptors=descriptors, targets=targets)
-
-
-def load_features(extractor, images, filename):
-    if not os.path.isfile(filename):
-        with open(filename, "wb") as fd:
-            generate_features(extractor, images, fd)
-
-    with open(filename, "rb") as fd:
-        return np.load(fd)
+    with open(targfile, "wb") as fd:
+        np.save(fd, np.asarray(targ, np.uint16))
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('coordinates', type=str, help='image-coordinate map')
     parser.add_argument('images', type=str, help='Street View image directory')
-    parser.add_argument('features', type=str, help='precomputed SIFT features')
+    parser.add_argument('outfile', type=str, help='computed feature output')
     args = parser.parse_args()
 
-    coordinates = build_coordinate_map(args.coordinates)
+    coordinates = load_coordinates(args.coordinates)
     images = load_images(args.images)
 
     # Perform a length-check to enforce consistency
     if len(images) % len(coordinates) != 0:
         sys.exit('image-coordinate map not consistent')
 
-    sift = cv2.xfeatures2d.SIFT_create()
-    data = load_features(sift, images, args.features)
+    # Use a SIFT feature extractor
+    extractor = cv2.xfeatures2d.SIFT_create()
+    build_features(extractor, images, args.outfile)
 
 
 
