@@ -20,7 +20,7 @@ class Search(object):
 
     def update(self, queries):
         # retrieve k+1 results and convert into np arrays
-        results = index.knnQueryBatch(queries, k + 1)
+        results = index.knnQueryBatch(queries, self.k + 1)
         i, d = map(np.array, zip(*results))
 
         # compute mask according to eqn. 1
@@ -35,11 +35,10 @@ class Search(object):
         return self.distances[i, m]
 
     def edge_weight(self, i, m, j, n):
-        dataset = self.dataset
+        d = self.dataset
 
-        i1 = dataset.target
-        c1 = dataset.coordinates[]
-        c2 = dataset.coordinates[]
+        c1 = d.target2coord(self.indices[i, m])
+        c2 = d.target2coord(self.indices[j, n])
 
         return distance(c1, c2).meters
 
