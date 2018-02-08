@@ -35,7 +35,7 @@ class DataLoader(object):
         filename = path.basename(image)
         index = path.splitext(filename)[0].split('_')[0]
 
-        return self.coordinates[index]
+        return self.coordinates[int(index)]
 
     @classmethod
     def create(cls, folder='data'):
