@@ -5,16 +5,16 @@ import os
 from collections import Counter
 
 import cv2
+import nmslib
 import numpy as np
 
 from geopy.distance import distance
 
-from util import load_coordinates, load_images
+from util import DataLoader
 
-class Search():
-    def __init__(self, coordinates, targets, index, k=5):
-        self.coordinates = coordinates
-        self.targets = targets
+class Search(object):
+    def __init__(self, dataset, index, k=5):
+        self.dataset = dataset
         self.index = index
         self.k = k
 
@@ -31,18 +31,15 @@ class Search():
         self.indices = i[mask,:-1]
         self.distances = d[mask,:-1]
 
-
     def node_cost(self, i, m):
         return self.distances[i, m]
 
     def edge_weight(self, i, m, j, n):
-        return 
+        return distance
         pass
 
     def search(self):
         satisfied = False
-
-        while not satisfied:
 
 
 
@@ -52,17 +49,17 @@ def hnsw():
     return x[:,0,:][(x[:,1,0] / x[:,1,-1]) <= 0.64]
 
 def main():
-    # index = AnnoyIndex(128, metric='euclidean')
-    # index.load('euclidean.annoy')
+    index = nmslib.init(method='hnsw', space='l2')
+    index.loadIndex('data/final.hnsw')
 
     sift = cv2.xfeatures2d.SIFT_create()
-    img = cv2.imread("data/test.png", cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread('data/test.png', cv2.IMREAD_GRAYSCALE)
     kp, des = sift.detectAndCompute(img, None)
 
-    target = np.load('data/features_targ')
+    dataset = DataLoader.create('data')
+    search = Search(dataset, index)
 
-    images = load_images('data/20180130_224839')
-    coordinates = load_coordinates('data/pruned')
+    search.update(des)
 
 
 
