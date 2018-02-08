@@ -21,11 +21,11 @@ def build_features(images, filename, bins=16):
     sift = cv2.xfeatures2d.SIFT_create()
 
     desc = []
-    targ = np.zeros(len(images), dtype=np.uint16)
+    targ = np.zeros(len(images), dtype=np.uint32)
 
     # idx = 0
     for i, img in enumerate(images):
-        image = cv2.imread(img)
+        image = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
         kp, des = sift.detectAndCompute(image, None)
 
         # for c in range(3):
