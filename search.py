@@ -15,7 +15,7 @@ class Search(object):
 
     def update(self, queries):
         # retrieve k+1 results and convert into np arrays
-        results = index.knnQueryBatch(queries, self.k + 1)
+        results = self.index.knnQueryBatch(queries, self.k + 1)
         i, d = map(np.array, zip(*results))
 
         # compute mask according to eqn. 1
