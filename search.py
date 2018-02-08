@@ -26,7 +26,7 @@ class Search(object):
         # compute mask according to eqn. 1
         mask = d[:,0] / d[:,-1] <= 0.64
 
-        # prune output, and remove last values
+        # prune output, and remove last values from query
         self.queries = queries[mask]
         self.indices = i[mask,:-1]
         self.distances = d[mask,:-1]
@@ -35,18 +35,18 @@ class Search(object):
         return self.distances[i, m]
 
     def edge_weight(self, i, m, j, n):
-        return distance
-        pass
+        dataset = self.dataset
+
+        i1 = dataset.target
+        c1 = dataset.coordinates[]
+        c2 = dataset.coordinates[]
+
+        return distance(c1, c2).meters
 
     def search(self):
         satisfied = False
 
 
-
-def hnsw():
-    x = np.array(index.knnQueryBatch(des, 6, 1), dtype=(np.int32, np.float32))
-    mask = (x[:,1,0] / x[:,1,-1]) <= 0.64
-    return x[:,0,:][(x[:,1,0] / x[:,1,-1]) <= 0.64]
 
 def main():
     index = nmslib.init(method='hnsw', space='l2')

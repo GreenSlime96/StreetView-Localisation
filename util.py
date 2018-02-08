@@ -28,6 +28,11 @@ class DataLoader(object):
 
     def target2coord(self, index):
         index = np.searchsorted(self.targets, index, side='right')
+        image = self.images[index]
+
+        filename = path.basename(filename)
+        index = path.splitext(filename)[0].split('_')[0]
+
         return self.coordinates[index]
 
     @classmethod
