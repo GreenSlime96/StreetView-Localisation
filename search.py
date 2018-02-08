@@ -42,21 +42,20 @@ class Search(object):
 
 
 def main():
-    pass
+    index = nmslib.init(method='hnsw', space='l2')
+    index.loadIndex('data/final.hnsw')
 
+    sift = cv2.xfeatures2d.SIFT_create()
+    img = cv2.imread('data/test.png', cv2.IMREAD_GRAYSCALE)
+    kp, des = sift.detectAndCompute(img, None)
 
-index = nmslib.init(method='hnsw', space='l2')
-index.loadIndex('data/final.hnsw')
+    dataset = DataLoader.create('data')
+    search = Search(dataset, index)
 
-sift = cv2.xfeatures2d.SIFT_create()
-img = cv2.imread('data/test.png', cv2.IMREAD_GRAYSCALE)
-kp, des = sift.detectAndCompute(img, None)
-
-dataset = DataLoader.create('data')
-search = Search(dataset, index)
-
-search.update(des)
+    search.update(des)
 
 
 if __name__ == "__main__":
     main()
+
+main()
