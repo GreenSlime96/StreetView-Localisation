@@ -9,7 +9,7 @@ import numpy as np
 from util import load_coordinates, load_images
 
 
-def build_features(extractor, images, filename, bins=16):
+def build_features(images, filename, bins=16):
     descfile = filename + '_desc'
     targfile = filename + '_targ'
     # histfile = filename + '_hist'
@@ -18,6 +18,7 @@ def build_features(extractor, images, filename, bins=16):
         sys.exit('filename in use: {}'.format(filename))
 
     # hist = np.empty(3 * bins * len(images), dtype=np.int32)
+    extractor = cv2.xfeatures2d.SIFT_create()
 
     desc = []
     targ = []
@@ -33,7 +34,7 @@ def build_features(extractor, images, filename, bins=16):
         #     idx += bins
 
         targ.extend([i] * len(des))
-        desc.extend(des)
+        desc.extend(des.astype(np.uint8))
 
         if i % 100 == 0:
             print('Images processed: {}'.format(i))
@@ -63,8 +64,7 @@ def main():
         sys.exit('image-coordinate map not consistent')
 
     # Use a SIFT feature extractor
-    extractor = cv2.xfeatures2d.SIFT_create()
-    build_features(extractor, images, args.outfile)
+    build_features(images, args.outfile)
 
 
 
