@@ -18,19 +18,21 @@ SEPARATOR_MULTIPLIER = 100
 #     ...:         x0 = x
 #     ...:         y0 = y
 #     ...:     print("{}\t{}".format(x0 - x, y0 - y))
-#     ...:     
+#     ...:
+
 
 class DataLoader(object):
     def __init__(self, folder):
         self.coordinates = load_coordinates(path.join(folder, 'coordinates'))
         self.images = load_images(path.join(folder, 'images'))
-        self.targets = np.load(path.join(folder, 'features_targ'), mmap_mode='r')
+        self.targets = np.load(
+            path.join(folder, 'features_targ'), mmap_mode='r')
 
     def target2coord(self, index):
         index = np.searchsorted(self.targets, index, side='right')
         image = self.images[index]
 
-        filename = path.basename(filename)
+        filename = path.basename(image)
         index = path.splitext(filename)[0].split('_')[0]
 
         return self.coordinates[index]
