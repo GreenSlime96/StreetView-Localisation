@@ -5,6 +5,19 @@ import sys
 # This allows for 100 angles per location should we need it
 SEPARATOR_MULTIPLIER = 100
 
+# In [28]: R = 6356752
+#     ...: x0 = y0 = None
+#     ...: for i in coordinates:
+#     ...:     lat, lon = map(lambda x: math.radians(float(x)), i.split(','))
+#     ...:     x = R * math.cos(lat) * math.cos(lon)
+#     ...:     y = R * math.cos(lat) * math.sin(lon)
+#     ...:     if not x0 and not y0:
+#     ...:         x0 = x
+#     ...:         y0 = y
+#     ...:     print("{}\t{}".format(x0 - x, y0 - y))
+#     ...:     
+
+
 def name_hash(filename):
     filename = os.path.basename(filename)
     split = os.path.splitext(filename)[0].split('_')
