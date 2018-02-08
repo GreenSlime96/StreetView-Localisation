@@ -3,6 +3,8 @@ import sys
 
 from os import path
 
+import numpy as np
+
 # This allows for 100 angles per location should we need it
 SEPARATOR_MULTIPLIER = 100
 
