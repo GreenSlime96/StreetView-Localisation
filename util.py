@@ -26,6 +26,10 @@ class DataLoader(object):
         self.images = load_images(path.join(folder, 'images'))
         self.targets = np.load(path.join(folder, 'features_targ'), mmap_mode='r')
 
+    def target2coord(self, index):
+        index = np.searchsorted(self.targets, index, side='right')
+        return self.coordinates[index]
+
     @classmethod
     def create(cls, folder='data'):
         if not path.isdir(folder):
@@ -47,7 +51,8 @@ def name_hash(filename):
 def load_coordinates(filename):
     if path.isfile(filename):
         with open(filename) as fd:
-            return fd.read().splitlines()
+            lines = fd.read().splitlines()
+            return [tuple(map(float, x.split(','))) for x in lines]
     else:
         sys.exit('not a file: {}'.format(filename))
 

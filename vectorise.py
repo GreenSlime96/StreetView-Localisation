@@ -21,11 +21,11 @@ def build_features(images, filename, bins=16):
     sift = cv2.xfeatures2d.SIFT_create()
 
     desc = []
-    targ = []
+    targ = np.zeros(len(images), dtype=np.uint16)
 
-    idx = 0
-    for i in range(len(images)):
-        image = cv2.imread(images[i])
+    # idx = 0
+    for i, img in enumerate(images):
+        image = cv2.imread(img)
         kp, des = sift.detectAndCompute(image, None)
 
         # for c in range(3):
@@ -34,7 +34,9 @@ def build_features(images, filename, bins=16):
         #     idx += bins
 
         # TODO: update this to use a more compact representation
-        targ.extend([i] * len(des))
+        # TODO: very-large scale; look at prefix-sum trees
+        # targ.extend([i] * len(des))
+        targ[i] = targ[i - 1] + len(kp)
         desc.extend(des.astype(np.uint8))
 
         if i % 100 == 0:
@@ -44,10 +46,10 @@ def build_features(images, filename, bins=16):
     #     np.save(fd, hists)
 
     with open(descfile, "wb") as fd:
-        np.save(fd, np.asarray(desc, np.uint8))
+        np.save(fd, np.asarray(desc))
 
     with open(targfile, "wb") as fd:
-        np.save(fd, np.asarray(targ, np.uint16))
+        np.save(fd, targ)
 
 
 def main():
