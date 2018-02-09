@@ -94,7 +94,7 @@ def main():
                                       args.distance, 1, args.radius)
 
     for point in results:
-        print("{},{}".format(point[0], point[1]))
+        print("{},{}".format(point[0], point[1]), flush=True)
 
 
 if __name__ == "__main__":

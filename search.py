@@ -1,3 +1,5 @@
+from collections import Counter
+
 import cv2
 import nmslib
 import numpy as np
@@ -5,6 +7,19 @@ import numpy as np
 from geopy.distance import distance
 
 from util import DataLoader
+
+# In [27]: %timeit np.bincount(vf(search.indices.flatten())).argsort()[-5:][::-1]
+# 3.69 ms ± 28.8 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+
+# In [28]: %timeit Counter([funky(x) for x in search.indices.flatten()]).most_common(5)
+# 3.83 ms ± 9.16 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+
+# In [29]: %timeit Counter([funky(x) for x in search.indices.flatten()]).most_common(5)
+# 3.81 ms ± 9.1 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+
+# In [30]: %timeit np.bincount(vf(search.indices.flatten())).argsort()[-5:][::-1]
+# 3.84 ms ± 172 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+
 
 
 class Search(object):
@@ -46,7 +61,7 @@ def main():
     index.loadIndex('data/final.hnsw')
 
     sift = cv2.xfeatures2d.SIFT_create()
-    img = cv2.imread('data/test.png', cv2.IMREAD_GRAYSCALE)
+    img = cv2.imread('data/mcdonalds.jpg', cv2.IMREAD_GRAYSCALE)
     kp, des = sift.detectAndCompute(img, None)
 
     dataset = DataLoader.create('data')
@@ -57,5 +72,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-main()

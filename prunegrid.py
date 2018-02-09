@@ -26,7 +26,7 @@ def main():
             coords = (location['lat'], location['lng'])
 
             if coords not in points:
-                print("{},{}".format(coords[0], coords[1]))
+                print("{},{}".format(coords[0], coords[1]), flush=True)
                 points.add(coords)
 
 
