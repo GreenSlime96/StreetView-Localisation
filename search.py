@@ -82,8 +82,6 @@ def main():
 
         filename = path.splitext(image)[0]
 
-        [(blah(x), y) for (x, y) in counts]
-
         with open(filename + '_base', 'w') as fp:
             coords = [dataset.target2coord(x) for x in search.i[:,:-1].flatten()]
             for c in coords:
