@@ -1,5 +1,14 @@
 #!/bin/bash
 
+CURL="curl -s -o "
+command -v $CURL >/dev/null 2>&1 || {
+  CURL="wget -qO "
+  command -v $CURL >/dev/null 2>&1 || {
+    echo >&2 "This script requires either curl or wget installed. Aborting.";
+    exit 1;
+  }
+}
+
 # Checks for API key, disregards validity
 if [[ $# -eq 0 ]] ; then
   echo 'missing Google Maps API key'
@@ -11,7 +20,7 @@ fi
 api_check="https://maps.googleapis.com/maps/api/streetview/metadata?"
 api_check+="location=0,0&key=${1}"
 
-if [[ $(curl -s $api_check) == *"REQUEST_DENIED"* ]]; then
+if [[ $("${CURL} - $api_check") == *"REQUEST_DENIED"* ]]; then
   echo "invalid API key: ${1}"
   exit
 fi
@@ -25,16 +34,20 @@ DIR=${2:-$(date +%Y%m%d_%H%M%S)}
 
 if [ -d "$DIR" ]; then
   echo "folder ${DIR} exists, please delete"
-  exit
+#  exit
 else
   echo "saving images in ${DIR}"
   mkdir "$DIR"
 fi
 
 # Iterate through STDIN input
-counter=0
+counter=1024
 while read line
 do
+  if [ -f "${DIR}/${counter}_4.jpg" ]; then
+    continue
+  fi
+
   echo "working on file $counter"
   NEW_URI="${BASE_URI}&location=$line"
 
@@ -42,10 +55,10 @@ do
   do
     heading=$((num*90))
     uri="${NEW_URI}&heading=$heading"
-    curl -s -o "${DIR}/${counter}_${num}.jpg" "${uri}"
+    $CURL "${DIR}/${counter}_${num}.jpg" "${uri}"
   done
 
-  curl -s -o "${DIR}/${counter}_4.jpg" "${uri}&pitch=90"
+  $CURL "${DIR}/${counter}_4.jpg" "${uri}&pitch=90"
 
   counter=$((counter+1))
 done < "/dev/stdin"
