@@ -82,13 +82,13 @@ def main():
 
         filename = path.splitext(image)[0]
 
-        with open(filename + '_base', 'w') as fp:
-            coords = [dataset.target2coord(x) for x in search.i[:,:-1].flatten()]
-            for c in coords:
-                fp.write("          new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
+        # with open(filename + '_base', 'w') as fp:
+        #     coords = [dataset.target2coord(x) for x in search.i[:,:-1].flatten()]
+        #     for c in coords:
+        #         fp.write("          new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
 
         with open(filename + '_prune', 'w') as fp:
-            coords = [dataset.target2coord(x) for x in search.i[:,:-1].flatten()]
+            coords = [dataset.target2coord(x) for x in search.indices[:,:-1].flatten()]
             for c in coords:
                 fp.write("          new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
 
