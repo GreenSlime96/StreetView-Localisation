@@ -32,14 +32,13 @@ def build_features(images, filename, bins=16):
         #     hists[idx:idx+bins] = hist
         #     idx += bins
 
-        # TODO: update this to use a more compact representation
         # TODO: very-large scale; look at prefix-sum trees
         # targ.extend([i] * len(des))
         targ[i] = targ[i - 1] + len(kp)
         desc.extend(des.astype(np.uint8))
 
         if i % 100 == 0:
-            print('Images processed: {}'.format(i))
+            print('images processed: {}'.format(i))
 
     # with open(histfile, "wb") as fd:
     #     np.save(fd, hists)

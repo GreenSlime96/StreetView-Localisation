@@ -74,7 +74,7 @@ def main():
 
     for image in images:
         print("working on: {}".format(image))
-        
+
         img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
         kp, des = sift.detectAndCompute(img, None)
 
@@ -82,17 +82,17 @@ def main():
 
         filename = path.splitext(image)[0]
 
+        [(blah(x), y) for (x, y) in counts]
+
         with open(filename + '_base', 'w') as fp:
-            target = [np.searchsorted(dataset.targets, x) for x in search.i[:,:-1].flatten()]
-            for i, j in Counter(target).most_common():
-                for k in range(j):
-                    fp.write("          new google.maps.LatLng({}, {}),\n".format(i[0], i[1]))
+            coords = [dataset.target2coord(x) for x in search.i[:,:-1].flatten()]
+            for c in coords:
+                fp.write("          new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
 
         with open(filename + '_prune', 'w') as fp:
-            target = [np.searchsorted(dataset.targets, x) for x in search.index[:,:-1].flatten()]
-            for i, j in Counter(target).most_common():
-                for k in range(j):
-                    fp.write("          new google.maps.LatLng({}, {}),\n".format(i[0], i[1]))
+            coords = [dataset.target2coord(x) for x in search.i[:,:-1].flatten()]
+            for c in coords:
+                fp.write("          new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
 
 if __name__ == "__main__":
     main()
