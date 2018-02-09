@@ -73,12 +73,14 @@ def main():
     sift = cv2.xfeatures2d.SIFT_create()
 
     for image in images:
+        print("working on: {}".format(image))
+        
         img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
         kp, des = sift.detectAndCompute(img, None)
 
         search.update(des)
 
-        filename = path.splitext(image)
+        filename = path.splitext(image)[0]
 
         with open(filename + '_base', 'w') as fp:
             target = [np.searchsorted(dataset.targets, x) for x in search.i[:,:-1].flatten()]
