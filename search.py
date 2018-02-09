@@ -1,4 +1,5 @@
 from collections import Counter
+from os import path
 
 import cv2
 import nmslib
@@ -33,6 +34,9 @@ class Search(object):
         results = self.index.knnQueryBatch(queries, self.k + 1)
         i, d = map(np.array, zip(*results))
 
+        # baseline, before pruning
+        self.i = i
+
         # compute mask according to eqn. 1
         mask = d[:, 0] / d[:, -1] <= 0.64
 
@@ -60,15 +64,31 @@ def main():
     index = nmslib.init(method='hnsw', space='l2')
     index.loadIndex('data/final.hnsw')
 
-    sift = cv2.xfeatures2d.SIFT_create()
-    img = cv2.imread('data/mcdonalds.jpg', cv2.IMREAD_GRAYSCALE)
-    kp, des = sift.detectAndCompute(img, None)
-
     dataset = DataLoader.create('data')
     search = Search(dataset, index)
 
-    search.update(des)
+    images = glob.glob('data/test_set/*.jpg')
+    sift = cv2.xfeatures2d.SIFT_create()
 
+    for image in images:
+        img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
+        kp, des = sift.detectAndCompute(img, None)
+
+        search.update(des)
+
+        filename = path.splitext(image)
+
+        with open(filename + '_base', 'w') as fp:
+            target = [np.searchsorted(dataset.targets, x) for x in search.i[:,:-1].flatten()]
+            for i, j in Counter(target).most_common():
+                for k in range(j):
+                    fp.write("          new google.maps.LatLng({}, {}),\n".format(i[0], i[1]))
+
+        with open(filename + '_prune', 'w') as fp:
+            target = [np.searchsorted(dataset.targets, x) for x in search.index[:,:-1].flatten()]
+            for i, j in Counter(target).most_common():
+                for k in range(j):
+                    fp.write("          new google.maps.LatLng({}, {}),\n".format(i[0], i[1]))
 
 if __name__ == "__main__":
     main()
