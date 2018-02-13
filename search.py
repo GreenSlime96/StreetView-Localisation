@@ -89,21 +89,13 @@ class Search(object):
         pass
 
     def smooth(self):
-        if self.smoothed is not None:
-            return self.smoothed
-
         bins = np.bincount(self.coords.flatten())
-        smoothed = np.zeros_like(bins, dtype=float)
 
-        for i, c in enumerate(bins):
-            mindistsq = 2 * self.dataset.mindist[i] ** 2
+        mindistsq = 2 * self.dataset.mindist[:len(bins)] ** 2
+        distsq = self.dataset.distances[:len(bins),:len(bins)] ** 2
 
-            for j, d in enumerate(bins):
-                distsq = self.dataset.distances[i][j] ** 2
-                smoothed[i] += math.exp(-distsq / mindistsq) * d
+        return np.sum(np.exp(-distsq/mindistsq) * bins[:,None], axis=0)
 
-        self.smoothed = smoothed
-        return smoothed
 
 
 class VideoProcessor(object):
