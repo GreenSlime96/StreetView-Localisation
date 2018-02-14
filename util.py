@@ -30,15 +30,15 @@ class DataLoader(object):
             path.join(folder, 'features_targ'), mmap_mode='r')
 
         self.distances = np.zeros((len(self.coordinates), ) * 2)
-        self.mindist = np.full(len(self.coordinates), np.inf)
+        self.min_dist = np.full(len(self.coordinates), np.inf)
 
         for i, c in enumerate(self.coordinates):
             for j, d in enumerate(self.coordinates[i + 1:], i + 1):
                 dist = fast_distance(c, d)
                 self.distances[i][j] = self.distances[j][i] = dist
 
-                self.mindist[i] = min(self.mindist[i], dist)
-                self.mindist[j] = min(self.mindist[j], dist)
+                self.min_dist[i] = min(self.min_dist[i], dist)
+                self.min_dist[j] = min(self.min_dist[j], dist)
 
     def target2index(self, index):
         return np.searchsorted(self.targets, index, side='right')
