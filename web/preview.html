@@ -49,12 +49,44 @@
     </div>
     <div id="map"></div>
     <script>
-
-      // This example requires the Visualization library. Include the libraries=visualization
-      // parameter when you first load the API. For example:
-      // <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&libraries=visualization">
-
       var map, heatmap;
+      var request = new XMLHttpRequest();
+      var data = [];
+
+      request.onreadystatechange = function () {
+        if (request.readyState == XMLHttpRequest.DONE) {
+          var contents = request.responseText;
+          
+          // reset this array
+          data.length = 0;
+          contents.split("\n").forEach( function(line) {
+            split = line.split(",").map(parseFloat);
+            if (split.length != 2) return;
+            data.push({lat:split[0], lng:split[1]});
+          });
+
+          if (path && path.getPath().length == coords.length)
+            return;
+
+          if (path) path.setMap(null);
+
+          path = new google.maps.Polyline({
+            path: coords,
+            geodesic: true,
+            strokeColor: '#FF0000',
+            strokeOpacity: 1.0,
+            strokeWeight: 2
+          });
+
+          path.setMap(map);
+        }
+      };
+
+      var refresh = setInterval(function() {
+        request.open("GET", "/data/coordinates", true)
+        request.send(null);
+      }, 1000)
+
 
       function initMap() {
         map = new google.maps.Map(document.getElementById('map'), {
@@ -64,7 +96,7 @@
         });
 
         heatmap = new google.maps.visualization.HeatmapLayer({
-          data: getPoints(),
+          data: data,
           map: map
         });
       }
@@ -99,12 +131,6 @@
 
       function changeOpacity() {
         heatmap.set('opacity', heatmap.get('opacity') ? null : 0.2);
-      }
-
-      // Heatmap data: 500 Points
-      function getPoints() {
-        return [
-        ];
       }
     </script>
     <script async defer

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Path Visualisation</title>
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script>
+      var request = new XMLHttpRequest();
+      var path = null;
+      var map;
+
+      request.onreadystatechange = function () {
+        if (request.readyState == XMLHttpRequest.DONE) {
+          var contents = request.responseText;
+          var coords = []
+
+          contents.split("\n").forEach( function(line) {
+            split = line.split(",").map(parseFloat);
+            if (split.length != 2) return;
+            coords.push({lat:split[0], lng:split[1]});
+          });
+
+          if (path && path.getPath().length == coords.length)
+            return;
+
+          if (path) path.setMap(null);
+
+          path = new google.maps.Polyline({
+            path: coords,
+            geodesic: true,
+            strokeColor: '#FF0000',
+            strokeOpacity: 1.0,
+            strokeWeight: 2
+          });
+
+          path.setMap(map);
+        }
+      };
+
+      var refresh = setInterval(function() {
+        request.open("GET", "/data/coordinates", true)
+        request.send(null);
+      }, 1000)
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 16,
+          center: {lat: 52.205044, lng: 0.119577},
+          mapTypeId: 'roadmap'
+        });
+      }
+    </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCtwK9v361GAoMqNBXAYdVRHptYiV6y4yA&callback=initMap">
+    </script>
+  </body>
+</html>
