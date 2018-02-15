@@ -50,12 +50,12 @@
           lines.pop();
 
           // reset if new path is smaller
-          if (lines.length < coords.length) coords.clear();
+          if (lines.length < data.length) data.clear();
 
-          lines.slice(coords.length).forEach(line => {
+          lines.slice(data.length).forEach(line => {
             split = line.split(",").map(parseFloat);
             if (split.length != 2) return;
-            coords.push(new google.maps.LatLng(...split));
+            data.push(new google.maps.LatLng(...split));
           });
 
           // reload the image
