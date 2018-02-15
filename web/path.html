@@ -16,54 +16,78 @@
         margin: 0;
         padding: 0;
       }
+      #image-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 5;
+        background-color: #fff;
+        padding: 5px;
+        border: 1px solid #999;
+      }
     </style>
   </head>
   <body>
+    <div id="image-panel">
+      <img id="frame">
+    </div>
     <div id="map"></div>
     <script>
-      var request = new XMLHttpRequest();
-      var path = null;
-      var map;
+      var frame = document.getElementById("frame");
+      var xhr = new XMLHttpRequest();
+      var delta = null, data = null;
 
-      request.onreadystatechange = function () {
-        if (request.readyState == XMLHttpRequest.DONE) {
-          var contents = request.responseText;
-          var coords = []
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == XMLHttpRequest.DONE) {
+          var modified = xhr.getResponseHeader("Last-Modified");
 
-          contents.split("\n").forEach( function(line) {
+          if (delta == modified) return;
+
+          var contents = xhr.responseText;
+
+          // get lines, removing last empty space
+          lines = contents.split("\n");
+          lines.pop();
+
+          // reset if new path is smaller
+          if (lines.length < coords.length) coords.clear();
+
+          lines.slice(coords.length).forEach(line => {
             split = line.split(",").map(parseFloat);
             if (split.length != 2) return;
-            coords.push({lat:split[0], lng:split[1]});
+            coords.push(new google.maps.LatLng(...split));
           });
 
-          if (path && path.getPath().length == coords.length)
-            return;
+          // reload the image
+          frame.src = '/data/frame.jpg?' + Date.now();
 
-          if (path) path.setMap(null);
-
-          path = new google.maps.Polyline({
-            path: coords,
-            geodesic: true,
-            strokeColor: '#FF0000',
-            strokeOpacity: 1.0,
-            strokeWeight: 2
-          });
-
-          path.setMap(map);
+          delta = modified;
         }
       };
 
-      var refresh = setInterval(function() {
-        request.open("GET", "/data/coordinates", true)
-        request.send(null);
-      }, 1000)
-
       function initMap() {
-        map = new google.maps.Map(document.getElementById('map'), {
+        var map = new google.maps.Map(document.getElementById('map'), {
           zoom: 16,
           center: {lat: 52.205044, lng: 0.119577},
           mapTypeId: 'roadmap'
         });
+
+        data = new google.maps.MVCArray();
+
+        var poly = new google.maps.Polyline({
+          path: data,
+          geodesic: true,
+          strokeColor: '#FF0000',
+          strokeOpacity: 1.0,
+          strokeWeight: 2
+        });
+
+        poly.setMap(map);
+
+        setInterval(function() {
+          xhr.open("GET", "/data/coordinates", true)
+          xhr.send(null);
+        }, 1000);
       }
     </script>
     <script async defer

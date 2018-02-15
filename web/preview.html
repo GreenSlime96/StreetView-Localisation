@@ -15,122 +15,76 @@
         margin: 0;
         padding: 0;
       }
-      #floating-panel {
+      #image-panel {
         position: absolute;
         top: 10px;
-        left: 25%;
+        right: 10px;
         z-index: 5;
         background-color: #fff;
         padding: 5px;
         border: 1px solid #999;
-        text-align: center;
-        font-family: 'Roboto','sans-serif';
-        line-height: 30px;
-        padding-left: 10px;
-      }
-      #floating-panel {
-        background-color: #fff;
-        border: 1px solid #999;
-        left: 25%;
-        padding: 5px;
-        position: absolute;
-        top: 10px;
-        z-index: 5;
       }
     </style>
   </head>
 
   <body>
-    <div id="floating-panel">
-      <button onclick="toggleHeatmap()">Toggle Heatmap</button>
-      <button onclick="changeGradient()">Change gradient</button>
-      <button onclick="changeRadius()">Change radius</button>
-      <button onclick="changeOpacity()">Change opacity</button>
+    <div id="image-panel">
+      <img id="frame">
     </div>
     <div id="map"></div>
     <script>
-      var map, heatmap;
-      var request = new XMLHttpRequest();
-      var data = [];
+      var frame = document.getElementById("frame");
+      var xhr = new XMLHttpRequest();
+      var delta = null, data = null;
 
-      request.onreadystatechange = function () {
-        if (request.readyState == XMLHttpRequest.DONE) {
-          var contents = request.responseText;
-          
-          // reset this array
-          data.length = 0;
-          contents.split("\n").forEach( function(line) {
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == XMLHttpRequest.DONE) {
+          var modified = xhr.getResponseHeader("Last-Modified");
+
+          if (delta == modified) return;
+
+          var contents = xhr.responseText;
+
+          // get lines, removing last empty space
+          lines = contents.split("\n");
+          lines.pop();
+
+          // reset data
+          data.clear();
+
+          lines.forEach(line => {
             split = line.split(",").map(parseFloat);
-            if (split.length != 2) return;
-            data.push({lat:split[0], lng:split[1]});
+            if (split.length != 3) return;
+            data.push({location: new google.maps.LatLng(split[0], split[1]),
+              weight: split[2]});
           });
 
-          if (path && path.getPath().length == coords.length)
-            return;
+          // reload the image
+          frame.src = '/data/frame.jpg?' + Date.now();
 
-          if (path) path.setMap(null);
-
-          path = new google.maps.Polyline({
-            path: coords,
-            geodesic: true,
-            strokeColor: '#FF0000',
-            strokeOpacity: 1.0,
-            strokeWeight: 2
-          });
-
-          path.setMap(map);
+          delta = modified;
         }
       };
 
-      var refresh = setInterval(function() {
-        request.open("GET", "/data/coordinates", true)
-        request.send(null);
-      }, 1000)
-
 
       function initMap() {
-        map = new google.maps.Map(document.getElementById('map'), {
+        var map = new google.maps.Map(document.getElementById('map'), {
           zoom: 16,
           center: {lat: 52.205044, lng: 0.119577},
           mapTypeId: 'roadmap'
         });
 
-        heatmap = new google.maps.visualization.HeatmapLayer({
+        data = new google.maps.MVCArray();
+
+        var heatmap = new google.maps.visualization.HeatmapLayer({
           data: data,
           map: map
         });
-      }
 
-      function toggleHeatmap() {
-        heatmap.setMap(heatmap.getMap() ? null : map);
-      }
-
-      function changeGradient() {
-        var gradient = [
-          'rgba(0, 255, 255, 0)',
-          'rgba(0, 255, 255, 1)',
-          'rgba(0, 191, 255, 1)',
-          'rgba(0, 127, 255, 1)',
-          'rgba(0, 63, 255, 1)',
-          'rgba(0, 0, 255, 1)',
-          'rgba(0, 0, 223, 1)',
-          'rgba(0, 0, 191, 1)',
-          'rgba(0, 0, 159, 1)',
-          'rgba(0, 0, 127, 1)',
-          'rgba(63, 0, 91, 1)',
-          'rgba(127, 0, 63, 1)',
-          'rgba(191, 0, 31, 1)',
-          'rgba(255, 0, 0, 1)'
-        ]
-        heatmap.set('gradient', heatmap.get('gradient') ? null : gradient);
-      }
-
-      function changeRadius() {
-        heatmap.set('radius', heatmap.get('radius') ? null : 20);
-      }
-
-      function changeOpacity() {
-        heatmap.set('opacity', heatmap.get('opacity') ? null : 0.2);
+        setInterval(function() {
+          xhr.open("GET", "/data/votes", true)
+          xhr.send(null);
+        }, 1000);
       }
     </script>
     <script async defer
