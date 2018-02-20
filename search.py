@@ -14,18 +14,6 @@ from scipy.stats import norm
 
 from util import DataLoader
 
-# In [27]: %timeit np.bincount(vf(search.indices.flatten())).argsort()[-5:][::-1]
-# 3.69 ms ± 28.8 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-# In [28]: %timeit Counter([funky(x) for x in search.indices.flatten()]).most_common(5)
-# 3.83 ms ± 9.16 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-# In [29]: %timeit Counter([funky(x) for x in search.indices.flatten()]).most_common(5)
-# 3.81 ms ± 9.1 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
-# In [30]: %timeit np.bincount(vf(search.indices.flatten())).argsort()[-5:][::-1]
-# 3.84 ms ± 172 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
 
 class Search(object):
     def __init__(self, dataset, index, k=5):
@@ -94,19 +82,6 @@ class Search(object):
         return self.smoothed
 
 
-class VideoProcessor(object):
-    def __init__(self, fps, skip=6):
-        self.sift = cv2.xfeatures2d.SIFT_create()
-        self.started = False
-        self.fps = fps
-
-    def process(self, frame):
-        pass
-
-    def finalise(self):
-        pass
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('video', type=str, help='video file')
@@ -134,6 +109,10 @@ def main():
     visited = np.zeros(len(dataset.coordinates))
     fps = int(cap.get(cv2.CAP_PROP_FPS) + 0.5)
     print("FPS: {} \t skip: {}".format(fps, args.skip))
+
+    # for joint-decoding; store all votes at time t
+    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    obs = np.empty((length // fps, len(dataset.coordinates)))
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -183,8 +162,9 @@ def main():
                     #       dataset.coordinates[most_likely])
                     # print(search.confidence(top[0]),
                     #       search.confidence(most_likely))
-
                     most_likely = last_coord
+                    idle_frames = 0
+
                 # else:
                 #     # print(search.confidence(most_likely))
 
@@ -198,8 +178,8 @@ def main():
             tiny = cv2.resize(frame, None, fx=0.5, fy=0.5)
             cv2.imwrite(path.join(args.web, 'frame.jpg'), tiny)
 
+#            obs[frames // fps - 1] = np.log(votes / votes.sum())
             votes = np.zeros_like(votes)
-            frames = 0
             idle_frames += 1
 
             if most_likely != last_coord:
@@ -213,40 +193,12 @@ def main():
 
     cap.release()
 
-    # for image in images:
-    #     print("working on: {}".format(image))
+    # convert votes to probabilities
+    obs /= obs.sum(axis=1, keepdims=True)
+    obs = obs.log()
 
-    #     img = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
-    #     kp, des = sift.detectAndCompute(img, None)
-
-    #     search.update(des)
-
-    #     filename = path.splitext(image)[0]
-
-    # with open(filename + '_base', 'w') as fp:
-    #     coords = [dataset.target2coord(x)
-    #               for x in search.i[:, :-1].flatten()]
-    #     for c in coords:
-    #         fp.write(
-    #             "new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
-
-    # with open(filename + '_prune', 'w') as fp:
-    #     coords = [dataset.target2coord(x)
-    #               for x in search.indices[:, :-1].flatten()]
-    #     for c in coords:
-    #         fp.write(
-    #             "new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
-
-    # with open(filename + '_smooth', 'w') as fp:
-    #     coords = []
-    #     for i, c in enumerate(search.smooth()):
-    #         coords.extend([dataset.coordinates[i]] * int(c))
-
-    #     print("{}: ".format(search.confidence()))
-
-    #     for c in coords:
-    #         fp.write(
-    #             "new google.maps.LatLng({}, {}),\n".format(c[0], c[1]))
+    states = np.zeros_like(obs)
+    states[0] = obs[0]
 
 
 if __name__ == "__main__":
