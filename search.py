@@ -1,3 +1,4 @@
+import argparse
 import glob
 import math
 
@@ -61,11 +62,10 @@ class Search(object):
 
         return (indices, counts)
 
-    def confidence(self):
+    def confidence(self, x_bar=None):
         smoothed = self.smooth()
 
         n = len(self.dataset.coordinates)
-        x_bar = np.argmax(smoothed)
         dist_sq = self.dataset.distances[x_bar][:len(smoothed)] ** 2
 
         top = np.sum(dist_sq ** 2 * smoothed) / n
@@ -80,11 +80,12 @@ class Search(object):
         if self.smoothed is not None:
             return self.smoothed
 
-        bins = np.bincount(self.coords.ravel())
+        coords = len(self.dataset.coordinates)
+        bins = np.bincount(self.coords.ravel(), minlength=coords)
 
         # TODO: consider reducing the precision to float32 for 2x speedup
-        min_distsq = 2 * self.dataset.min_dist[:len(bins)] ** 2
-        distsq = self.dataset.distances[:len(bins), :len(bins)] ** 2
+        min_distsq = 2 * self.dataset.min_dist ** 2
+        distsq = self.dataset.distances ** 2
         wexponent = np.exp(-distsq / min_distsq) * bins[:, None]
 
         self.smoothed = np.sum(wexponent, axis=0)
@@ -141,6 +142,14 @@ class VideoProcessor(object):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('video', type=str, help='video file')
+    parser.add_argument('--web', type=str, default=path.join('web', 'data'),
+                        help='web data directory')
+    parser.add_argument('--skip', type=int, default=5,
+                        help='process every nth frame')
+    args = parser.parse_args()
+
     index = nmslib.init(method='hnsw', space='l2')
     index.loadIndex('data/final.hnsw')
 
@@ -148,7 +157,7 @@ def main():
     search = Search(dataset, index)
 
     # images = glob.glob('data/test_set/*.jpg')
-    cap = cv2.VideoCapture('data/test_videos/1.mp4')
+    cap = cv2.VideoCapture(args.video)
     sift = cv2.xfeatures2d.SIFT_create()
 
     last_coord = None
@@ -158,7 +167,7 @@ def main():
     votes = np.zeros(len(dataset.coordinates))
     visited = np.zeros(len(dataset.coordinates))
     fps = int(cap.get(cv2.CAP_PROP_FPS) + 0.5)
-    print("Input FPS: {}".format(fps))
+    print("FPS: {} \t skip: {}".format(fps, args.skip))
 
     while cap.isOpened():
         ret, frame = cap.read()
@@ -167,10 +176,11 @@ def main():
         if not ret:
             break
 
-        if frames % 5 != 0 and last_coord:
+        if frames % args.skip != 0 and last_coord:
             continue
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # gray = cv2.resize(gray, None, fx=0.5, fy=0.5)
         kp, des = sift.detectAndCompute(gray, None)
 
         search.update(des)
@@ -186,6 +196,7 @@ def main():
         votes[:len(count)] += count
 
         if frames % fps == 0:
+            top = np.argsort(-votes)
 
             if not last_coord:
                 most_likely = np.argmax(votes)
@@ -196,38 +207,42 @@ def main():
                 distances = dataset.distances[last_coord]
                 min_dist = max(10, dataset.min_dist[last_coord])
 
-                # print("// {:.2f}".format(min_dist))
-
                 likelihoods = norm.pdf(
                     distances / ((idle_frames + 2) * min_dist))
 
                 most_likely = np.argmax(likelihoods * votes)
 
                 if most_likely not in top[:10]:
-                    print("// {} improbable".format(dataset.coordinates[most_likely]))
+                    # print(votes[top[0]], votes[most_likely],
+                    #       dataset.coordinates[top[0]],
+                    #       dataset.coordinates[most_likely])
+                    # print(search.confidence(top[0]),
+                    #       search.confidence(most_likely))
+
                     most_likely = last_coord
-
-
-
-                # if distances[most_likely] > 100:
-                #     most_likely = last_coord
                 # else:
-                #     most_likely = top_20[most_likely]
+                #     # print(search.confidence(most_likely))
 
-                # print("// ", end="")
-                # print(votes[most_likely], np.amax(votes),
-                #       likelihoods[most_likely], likelihoods[np.argmax(votes)],
-                #       dataset.coordinates[np.argmax(votes)])
+            with open(path.join(args.web, 'votes'), 'w') as fp:
+                for indices in top:
+                    count = votes[indices]
+                    coord = dataset.coordinates[indices]
+
+                    fp.write("{},{},{}\n".format(*coord, count))
+
+            tiny = cv2.resize(frame, None, fx=0.5, fy=0.5)
+            cv2.imwrite(path.join(args.web, 'frame.jpg'), tiny)
 
             votes = np.zeros_like(votes)
             frames = 0
-            visited += 1
             idle_frames += 1
 
             if most_likely != last_coord:
                 idle_frames = 0
+                visited += 1
+
                 coord = dataset.coordinates[most_likely]
-                print("{{lat:{},lng:{}}},".format(coord[0], coord[1]))
+                print("{},{}".format(*coord), flush=True)
 
             last_coord = most_likely
 

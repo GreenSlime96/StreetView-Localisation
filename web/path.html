@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no">
+    <meta charset="utf-8">
+    <title>Path Visualisation</title>
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #image-panel {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 5;
+        background-color: #fff;
+        padding: 5px;
+        border: 1px solid #999;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="image-panel">
+      <img id="frame">
+    </div>
+    <div id="map"></div>
+    <script>
+      var frame = document.getElementById("frame");
+      var xhr = new XMLHttpRequest();
+      var delta = null, data = null;
+
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == XMLHttpRequest.DONE) {
+          var modified = xhr.getResponseHeader("Last-Modified");
+
+          if (delta == modified) return;
+
+          var contents = xhr.responseText;
+
+          // get lines, removing last empty space
+          lines = contents.split("\n");
+          lines.pop();
+
+          // reset if new path is smaller
+          if (lines.length < data.length) data.clear();
+
+          lines.slice(data.length).forEach(line => {
+            split = line.split(",").map(parseFloat);
+            if (split.length != 2) return;
+            data.push(new google.maps.LatLng(...split));
+          });
+
+          // reload the image
+          frame.src = '/data/frame.jpg?' + Date.now();
+
+          delta = modified;
+        }
+      };
+
+      function initMap() {
+        var map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 16,
+          center: {lat: 52.205044, lng: 0.119577},
+          mapTypeId: 'roadmap'
+        });
+
+        data = new google.maps.MVCArray();
+
+        var poly = new google.maps.Polyline({
+          path: data,
+          geodesic: true,
+          strokeColor: '#FF0000',
+          strokeOpacity: 1.0,
+          strokeWeight: 2
+        });
+
+        poly.setMap(map);
+
+        setInterval(function() {
+          xhr.open("GET", "/data/coordinates", true)
+          xhr.send(null);
+        }, 1000);
+      }
+    </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCtwK9v361GAoMqNBXAYdVRHptYiV6y4yA&callback=initMap">
+    </script>
+  </body>
+</html>
