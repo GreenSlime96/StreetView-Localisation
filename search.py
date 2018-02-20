@@ -52,22 +52,11 @@ class Search(object):
         # reset for re-memoisation
         self.smoothed = None
 
-    def node_cost(self, i, m):
-        return self.distances[i, m]
-
-    def edge_weight(self, i, m, j, n):
-        d = self.dataset
-
-        c1 = d.target2coord(self.indices[i, m])
-        c2 = d.target2coord(self.indices[j, n])
-
-        return distance(c1, c2).meters
-
     def coords(self):
         return [self.dataset.coordinates[x] for x in self.coords.flatten()]
 
     def search(self):
-        counts = np.bincount(self.coords.ravel()).astype(np.uint16)
+        counts = np.bincount(self.coords.ravel())
         indices = np.argsort(counts)
 
         return (indices, counts)
@@ -75,15 +64,14 @@ class Search(object):
     def confidence(self):
         smoothed = self.smooth()
 
-        expected = np.argmax(smoothed)
-        min_dist = self.dataset.min_dist[expected] ** 4
+        n = len(self.dataset.coordinates)
+        x_bar = np.argmax(smoothed)
+        dist_sq = self.dataset.distances[x_bar][:len(smoothed)] ** 2
 
-        # TODO: need to figure out how this actually works
-        confidence = 0
-        for i, c in enumerate(smoothed):
-            confidence += self.dataset.distances[expected][i] ** 4 * c
+        top = np.sum(dist_sq ** 2 * smoothed) / n
+        bot = (np.sum(dist_sq) / n) ** 2
 
-        return -3 + confidence / min_dist
+        return (top / bot) - 3
 
     def count(self):
         pass
@@ -105,15 +93,50 @@ class Search(object):
 
 
 class VideoProcessor(object):
-    def __init__(self, fps, skip=6):
-        self.sift = cv2.xfeatures2d.SIFT_create()
-        self.started = False
-        self.fps = fps
+    def __init__(self, dataset, states):
+        self.dataset = dataset
+        self.reset(states)
 
-    def process(self, frame):
+    def reset(self, states):
+        self.votes = []
+
+    def update(self, votes):
+        self.votes.append(votes)
+
+    def naive(self):
+        votes = self.votes[-1]
+        max_votes = np.where(votes == np.amax(votes))[0]
+
+        if len(max_votes) != 1:
+            # break tie by finding the vote with most supporters
+            # more support = less distance between bits...
+            d = self.dataset.distances[max_votes,:][:,max_votes]
+            index = max_votes[np.argmin(np.sum(d, axis=0))]
+        else:
+            # naively pick the most-occuring vote
+            index = max_votes[0]
+
+        return index;
+
+    def boon(self):
+        votes = self.votes[-1]
+        priors = np.ones_like(votes)
+
+        # load priors if they exist
+        if len(self.votes) != 1:
+            priors = self.votes[-2]
+
+
+
+
+
+    def PFilter(self):
         pass
 
-    def finalise(self):
+    def KFilter(self):
+        pass
+
+    def HMM(self):
         pass
 
 
@@ -155,10 +178,10 @@ def main():
         # VIDEO PROCESSING LOGIC
 
         # update coordinate counts
-        if not last_coord:
-            count = search.smooth()
-        else:
+        if last_coord is not None:
             count = np.bincount(search.coords.ravel())
+        else:
+            count = search.smooth()
 
         votes[:len(count)] += count
 
@@ -167,10 +190,10 @@ def main():
             if not last_coord:
                 most_likely = np.argmax(votes)
             else:
-                top_20 = np.argsort(-votes)[:50]
-                n_votes = votes[top_20]
+                probs = votes / sum(votes)
+                top = np.argsort(-votes)
 
-                distances = dataset.distances[last_coord][top_20]
+                distances = dataset.distances[last_coord]
                 min_dist = max(10, dataset.min_dist[last_coord])
 
                 # print("// {:.2f}".format(min_dist))
@@ -178,7 +201,13 @@ def main():
                 likelihoods = norm.pdf(
                     distances / ((idle_frames + 2) * min_dist))
 
-                most_likely = top_20[np.argmax(likelihoods * n_votes)]
+                most_likely = np.argmax(likelihoods * votes)
+
+                if most_likely not in top[:10]:
+                    print("// {} improbable".format(dataset.coordinates[most_likely]))
+                    most_likely = last_coord
+
+
 
                 # if distances[most_likely] > 100:
                 #     most_likely = last_coord
@@ -201,45 +230,6 @@ def main():
                 print("{{lat:{},lng:{}}},".format(coord[0], coord[1]))
 
             last_coord = most_likely
-
-            # maxprob = 0
-            # maxcoord = None
-            # maxdist = None
-
-            # if lastcoord and velocity:
-            #     newcoord = (lastcoord[0] + velocity[0],
-            #                 lastcoord[1] + velocity[1])
-
-            #     # d_v = distance(newcoord, lastcoord).meters
-            #     # d_v = d_v if d_v else 12
-
-            #     for coord, count in votes:
-            #         dist = distance(newcoord, c).meters
-
-            #         prob = norm.pdf(dist / 50) * n
-
-            #         if prob > maxprob:
-            #             maxdist = dist
-            #             maxprob = prob
-            #             maxcoord = c
-
-            #     # if maxdist > 100:
-            #     #     maxcoord = lastcoord
-
-            # else:
-            #     # topmost item
-            #     maxcoord = common[0][0]
-            #     lastcoord = maxcoord
-
-            # coord = maxcoord
-
-            # if coord != lastcoord or not velocity:
-            #     velocity = (coord[0] - lastcoord[0], coord[1] - lastcoord[1])
-            #     print("{{lat:{},lng:{}}},".format(coord[0], coord[1]))
-
-            # lastcoord = coord
-
-            # coord = None
 
     cap.release()
 
