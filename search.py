@@ -54,7 +54,6 @@ class Search(object):
         smoothed = self.smooth()
 
         n = len(self.dataset.coordinates)
-        x_bar = x_bar if x_bar else None
         dist_sq = self.dataset.distances[x_bar][:len(smoothed)] ** 2
 
         top = np.sum(dist_sq ** 2 * smoothed) / n
@@ -80,7 +79,6 @@ class Search(object):
         self.smoothed = np.sum(wexponent, axis=0)
 
         return self.smoothed
-
 
 def main():
     parser = argparse.ArgumentParser()
@@ -146,6 +144,9 @@ def main():
             if not last_coord:
                 most_likely = np.argmax(votes)
             else:
+                probs = votes / sum(votes)
+                top = np.argsort(-votes)
+
                 distances = dataset.distances[last_coord]
                 min_dist = max(10, dataset.min_dist[last_coord])
 
@@ -153,8 +154,6 @@ def main():
                     distances / ((idle_frames + 2) * min_dist))
 
                 most_likely = np.argmax(likelihoods * votes)
-                # print(votes[top[:10]])
-                # print(sum(votes[top[:10]]) / sum(votes[top[:20]]))
 
                 if most_likely not in top[:10]:
                     # print(votes[top[0]], votes[most_likely],
