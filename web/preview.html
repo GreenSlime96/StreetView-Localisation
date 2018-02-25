@@ -82,9 +82,9 @@
         });
 
         setInterval(function() {
-          xhr.open("GET", "/data/votes", true)
+          xhr.open("GET", "/data/votes?" + Date.now(), true)
           xhr.send(null);
-        }, 1000);
+        }, 250);
       }
     </script>
     <script async defer

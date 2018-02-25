@@ -58,11 +58,11 @@
             data.push(new google.maps.LatLng(...split));
           });
 
-          // reload the image
-          frame.src = '/data/frame.jpg?' + Date.now();
-
           delta = modified;
         }
+
+        // reload the image
+        frame.src = '/data/frame.jpg?' + Date.now();
       };
 
       function initMap() {
@@ -85,7 +85,7 @@
         poly.setMap(map);
 
         setInterval(function() {
-          xhr.open("GET", "/data/coordinates", true)
+          xhr.open("GET", "/data/coordinates?" + Date.now(), true)
           xhr.send(null);
         }, 1000);
       }

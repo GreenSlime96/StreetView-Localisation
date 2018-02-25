@@ -2,18 +2,36 @@ import numpy as np
 
 from scipy.stats import norm
 
-class NaiveFilter:
+
+class Filter(object):
     def __init__(self, dataset):
         self.dataset = dataset
-        self.reset()        
+        self.reset()
 
-    def predict(self, votes):
+    def predict(self, votes, infer):
+        if not infer:
+            self.states.append(votes)
+
+    def get_path(self):
+        return [self.predict(v, True) for v in self.states]
+
+    def reset(self):
+        self.states = []
+
+
+class NaiveFilter(Filter):
+    def __init__(self, dataset):
+        super().__init__(dataset)
+
+    def predict(self, votes, infer=False):
+        super().predict(votes, infer)
+
         max_votes = np.where(votes == np.amax(votes))[0]
 
         if len(max_votes) != 1:
             # break tie by finding the vote with most supporters
             # more support = less distance between bits...
-            d = self.dataset.distances[max_votes,:][:,max_votes]
+            d = self.dataset.distances[max_votes, :][:, max_votes]
             index = max_votes[np.argmin(np.sum(d, axis=0))]
         else:
             # naively pick the most-occuring vote
@@ -21,91 +39,91 @@ class NaiveFilter:
 
         return index
 
-    def reset(self):
-        self.votes = []
 
-
-
-
-class SequenceFilter(Filter):
-    def __init__(self, dataset):
-        super().__init__(dataset)
-        self.reset()
-
-    def reset(self):
-        self.states = []
-
-    def predict(self, votes)
-        pass
-
-
-class Viterbi(SequenceFilter):
-    def __init__(self, dataset):
-        super.__init__(dataset)
+class Viterbi(Filter):
+    def __init__(self, dataset, epsilon=0.001):
+        self.epsilon = epsilon
 
         # compute transmission probabilities using the 2nd
         # most distant point as the standard deviation
         sd = np.sort(dataset.distances)[:, 2][:, None]
         self.A = norm.logpdf(dataset.distances, 0, sd)
 
-    def predict(self, votes):
-        self.states.append(votes)
+        super().__init__(dataset)
 
-        sd = np.sort(self.dataset.distances)[:, 2]
-        em = 
+    def predict(self, votes, infer=False):
+        super().predict(votes, infer)
 
-        T1 = np.zeros((len(self.states), len(votes)))
-        T2 = np.zeros_like(T1)
+        # create new variable and calculate log-probability
+        probs = votes + self.epsilon
+        probs /= probs.sum()
+        B = np.log(probs)
 
-        T1[:, 0] = self.states[0]
-        T2[:, 0] = 0
+        if not self.T1:
+            self.mask = np.arange(len(votes))
+            t2 = np.zeros(len(votes), dtype=np.uint16)
+            t1 = B
+        else:
+            temp = self.T1[-1] + self.A + B
+            t2 = temp.argmax(axis=1).astype(np.uint16)
+            t1 = temp[self.mask, t2]
 
-        for i in range(1, len(self.states)):
-            for j in range(len(votes)):
-                probs = T1[:, i - 1] * self.A[j]
-                T1[j, i] = np.amax()
+        self.T1.append(t1)
+        self.T2.append(t2)
+
+        return t1.argmax()
+
+    def get_path(self):
+        Z = np.zeros(len(self.states), dtype=np.uint16)
+        Z[-1] = np.argmax(self.T1[-1])
+
+        for i in range(len(self.states) - 1, 0, -1):
+            Z[i - 1] = self.T2[i][Z[i]]
+
+        return Z
+
+    def reset(self):
+        super().reset()
+
+        self.T1 = []
+        self.T2 = []
 
 
-class Particle(SequenceFilter):
-    def __init__(self, dataset):
-        super.__init__(dataset)
+class Particle(Filter):
+    def __init__(self, dataset, n_particles=10000, velocity=5):
+        # particle transitions modelled by constant velocity, normalised to
+        # represent the probabilities of transitions from a state
+        self.transitions = norm.pdf(dataset.distances, velocity, 2 * velocity)
+        self.transitions /= self.transitions.sum(axis=1, keepdims=True)
 
+        self.n_particles = n_particles
 
-def viterbi(dataset, votes):
-    # smooth the votes by adding one
-    votes = votes + 1
+        super().__init__(dataset)
 
-    # calculate log-probabilities
-    probs = votes / votes.sum(axis=1, keepdims=True)
-    B = np.log(probs)
+    def predict(self, votes, infer=False):
+        super().predict(votes, infer)
 
-    # maybe replace 0 with dataset.min_dist[:,None]
-    sd = np.sort(dataset.distances)[:, 2]
-    A = norm.logpdf(dataset.distances, 0, sd[:, None])
+        # weight and resample
+        particles = self.particles * votes
+        particles *= self.n_particles / particles.sum()
 
-    T1 = np.zeros((len(votes), len(votes[0])))
-    T2 = np.zeros_like(T1, dtype=np.uint16)
+        # motion update
+        self.particles = np.dot(self.transitions, particles)
 
-    T1[0] = B[0]
-    T2[0] = 0
+        return particles.argmax()
 
-    mask = np.arange(len(votes[0]))
-    for i in range(1, len(votes)):
-        temp = T1[i - 1] + A + B[i]
-        T2[i] = np.argmax(temp, axis=1)
-        T1[i] = temp[mask, T2[i]]
+    def reset(self):
+        super().reset()
 
-        # c1 = np.argmax(T1[i])
-        # c2 = np.argmax(T1[i - 1])
+        self.particles = np.empty(len(self.dataset.coordinates))
+        self.particles.fill(self.n_particles / len(self.particles))
 
-        # if dataset.distances[c1][c2] > 100:
-        #     T1[i] = T1[i - 1]
-        #     T2[i] = T2[i - 1]
+    def get_path(self):
+        particles = self.particles
+        self.particles.fill(self.n_particles / len(particles))
 
-    Z = np.zeros(len(votes), dtype=np.uint16)
-    Z[-1] = np.argmax(T1[-1])
+        path = super().get_path()
 
-    for i in range(len(votes) - 1, 0, -1):
-        Z[i - 1] = T2[i, Z[i]]
+        self.particles = particles
 
-    return (T1, T2, Z)
+        return path
