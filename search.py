@@ -9,13 +9,13 @@ import cv2
 import nmslib
 import numpy as np
 
-from geopy.distance import distance
 from scipy.stats import norm
 
-from util import DataLoader
+from filters import Particle
+from util import DataLoader, haversine
 
 
-class Search(object):
+class Search:
     def __init__(self, dataset, index, k=5):
         self.dataset = dataset
         self.index = index
@@ -41,9 +41,6 @@ class Search(object):
         # reset for re-memoisation
         self.smoothed = None
 
-    def coords(self):
-        return [self.dataset.coordinates[x] for x in self.coords.flatten()]
-
     def search(self):
         counts = np.bincount(self.coords.ravel())
         indices = np.argsort(counts)
@@ -61,9 +58,6 @@ class Search(object):
 
         return (top / bot) - 3
 
-    def count(self):
-        pass
-
     def smooth(self):
         if self.smoothed is not None:
             return self.smoothed
@@ -80,6 +74,163 @@ class Search(object):
 
         return self.smoothed
 
+
+class VideoProcessor:
+    def __init__(self, search, filter, skip=5, web=None):
+        self.search = search
+        self.filter = filter
+        self.skip = skip
+        self.web = web
+
+    def process(self, video, truth=None):
+        cap = cv2.VideoCapture(video)
+        sift = cv2.xfeatures2d.SIFT_create()
+
+        frames = 0
+        search = self.search
+        coords = search.dataset.coordinates
+
+        filter = self.filter
+        filter.reset()
+
+        fps = round(cap.get(cv2.CAP_PROP_FPS))
+        votes = np.zeros(len(coords))
+
+        last_seen = None
+        visited = []
+
+        if self.web:
+            path_fp = open(path.join(self.web, 'coordinates'), 'w+')
+            path_gps = open(path.join(self.web, 'gps'), 'w+')
+
+        while cap.isOpened():
+            ret, frame = cap.read()
+            frames += 1
+
+            if not ret:
+                break
+
+            if frames % self.skip != 0:
+                continue
+
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            kp, des = sift.detectAndCompute(gray, None)
+
+            search.update(des)
+
+            counts = np.bincount(search.coords.ravel())
+            votes[:len(counts)] += counts
+
+            if frames % fps == 0:
+                most_likely = filter.predict(votes)
+
+                if self.web:
+                    tiny = cv2.resize(frame, None, fx=0.5, fy=0.5)
+                    cv2.imwrite(path.join(self.web, 'frame.jpg'), tiny)
+
+                    with open(path.join(self.web, 'votes'), 'w+') as fp:
+                        for idx, count in enumerate(votes):
+                            if count == 0:
+                                continue
+
+                            fp.write("{},{},{}\n".format(*coords[idx], count))
+
+                    with open(path.join(self.web, 'particles'), 'w+') as fp:
+                        particles = (filter.particles * 0.1).astype(int)
+                        for idx, count in enumerate(particles):
+                            if count == 0:
+                                continue
+
+                            fp.write("{},{},{}\n".format(*coords[idx], count))
+
+                    if most_likely != last_seen:
+                        last_seen = most_likely
+
+                        path_fp.write("{},{}\n".format(*coords[most_likely]))
+                        path_fp.flush()
+
+                        # calculate MST
+                        if most_likely not in visited:
+                            visited.append(most_likely)
+
+                            if len(visited) > 1:
+                                a = np.array(list(visited))
+                                d = search.dataset.distances[a][:, a]
+                                mst = a[minimum_spanning_tree(d)]
+
+                                with open(path.join(self.web, 'mst'), 'w+') as fp:
+                                    last = None
+                                    fmt = "{},{}\n"
+                                    for a, b in mst:
+                                        if last != a:
+                                            fp.write("===================\n")
+                                            fp.write(fmt.format(*coords[a]))
+
+                                        fp.write(fmt.format(*coords[b]))
+                                        last = b
+
+                coord = coords[most_likely]
+
+                if truth is not None:
+                    time = frames // fps
+
+                    idx = truth[:, 0].searchsorted(time) - 1
+                    err = haversine(truth[:, 1:][idx], coord)
+
+                    path_gps.write("{},{}\n".format(*truth[:, 1:][idx]))
+                    path_gps.flush()
+
+                    print("error: {:.2f}m".format(err))
+
+                votes.fill(0)
+
+        if self.web:
+            path_fp.close()
+            path_gps.close()
+
+
+def adjust_gamma(image, gamma=2.0):
+    # build a lookup table mapping the pixel values [0, 255] to
+    # their adjusted gamma values
+    invGamma = 1.0 / gamma
+    table = np.array([((i / 255.0) ** invGamma) * 255
+                      for i in np.arange(0, 256)]).astype("uint8")
+
+    # apply gamma correction using the lookup table
+    return cv2.LUT(image, table)
+
+
+def minimum_spanning_tree(X, copy_X=True):
+    """X are edge weights of fully connected graph"""
+    if copy_X:
+        X = X.copy()
+
+    if X.shape[0] != X.shape[1]:
+        raise ValueError("X needs to be square matrix of edge weights")
+    n_vertices = X.shape[0]
+    spanning_edges = []
+
+    # initialize with node 0:
+    visited_vertices = [0]
+    num_visited = 1
+    # exclude self connections:
+    np.fill_diagonal(X, np.inf)
+
+    while num_visited != n_vertices:
+        new_edge = np.argmin(X[visited_vertices], axis=None)
+        # 2d encoding of new_edge from flat, get correct indices
+        new_edge = divmod(new_edge, n_vertices)
+        new_edge = [visited_vertices[new_edge[0]], new_edge[1]]
+        # add edge to tree
+        spanning_edges.append(new_edge)
+        visited_vertices.append(new_edge[1])
+        # remove all edges inside current tree
+        X[visited_vertices, new_edge[1]] = np.inf
+        X[new_edge[1], visited_vertices] = np.inf
+        num_visited += 1
+    return np.vstack(spanning_edges)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('video', type=str, help='video file')
@@ -95,109 +246,14 @@ def main():
     dataset = DataLoader.create('data')
     search = Search(dataset, index)
 
-    # images = glob.glob('data/test_set/*.jpg')
-    cap = cv2.VideoCapture(args.video)
-    sift = cv2.xfeatures2d.SIFT_create()
+    with open('data/test_videos/2_raw.csv') as fp:
+        data = fp.read().replace(',', '\n').splitlines()
+        truth = np.fromiter(data, float).reshape(-1, 3)
 
-    last_coord = None
-    idle_frames = 0
-    frames = 0
+    pf = Particle(dataset)
+    vp = VideoProcessor(search, pf, skip=args.skip, web=args.web)
 
-    votes = np.zeros(len(dataset.coordinates))
-    visited = np.zeros(len(dataset.coordinates))
-    fps = int(cap.get(cv2.CAP_PROP_FPS) + 0.5)
-    print("FPS: {} \t skip: {}".format(fps, args.skip))
-
-    # for joint-decoding; store all votes at time t
-    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    obs = np.empty((length // fps, len(dataset.coordinates)))
-
-    while cap.isOpened():
-        ret, frame = cap.read()
-        frames += 1
-
-        if not ret:
-            break
-
-        if frames % args.skip != 0 and last_coord:
-            continue
-
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # gray = cv2.resize(gray, None, fx=0.5, fy=0.5)
-        kp, des = sift.detectAndCompute(gray, None)
-
-        search.update(des)
-
-        # VIDEO PROCESSING LOGIC
-
-        # update coordinate counts
-        if last_coord is not None:
-            count = np.bincount(search.coords.ravel())
-        else:
-            count = search.smooth()
-
-        votes[:len(count)] += count
-
-        if frames % fps == 0:
-            top = np.argsort(-votes)
-
-            if not last_coord:
-                most_likely = np.argmax(votes)
-            else:
-                probs = votes / sum(votes)
-                top = np.argsort(-votes)
-
-                distances = dataset.distances[last_coord]
-                min_dist = max(10, dataset.min_dist[last_coord])
-
-                likelihoods = norm.pdf(
-                    distances / ((idle_frames + 2) * min_dist))
-
-                most_likely = np.argmax(likelihoods * votes)
-
-                if most_likely not in top[:10]:
-                    # print(votes[top[0]], votes[most_likely],
-                    #       dataset.coordinates[top[0]],
-                    #       dataset.coordinates[most_likely])
-                    # print(search.confidence(top[0]),
-                    #       search.confidence(most_likely))
-                    most_likely = last_coord
-                    idle_frames = 0
-
-                # else:
-                #     # print(search.confidence(most_likely))
-
-            with open(path.join(args.web, 'votes'), 'w') as fp:
-                for indices in top:
-                    count = votes[indices]
-                    coord = dataset.coordinates[indices]
-
-                    fp.write("{},{},{}\n".format(*coord, count))
-
-            tiny = cv2.resize(frame, None, fx=0.5, fy=0.5)
-            cv2.imwrite(path.join(args.web, 'frame.jpg'), tiny)
-
-#            obs[frames // fps - 1] = np.log(votes / votes.sum())
-            votes = np.zeros_like(votes)
-            idle_frames += 1
-
-            if most_likely != last_coord:
-                idle_frames = 0
-                visited += 1
-
-                coord = dataset.coordinates[most_likely]
-                print("{},{}".format(*coord), flush=True)
-
-            last_coord = most_likely
-
-    cap.release()
-
-    # convert votes to probabilities
-    obs /= obs.sum(axis=1, keepdims=True)
-    obs = obs.log()
-
-    states = np.zeros_like(obs)
-    states[0] = obs[0]
+    vp.process(args.video, truth=truth)
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ class Filter(object):
         self.states = []
 
 
-class NaiveFilter(Filter):
+class Naive(Filter):
     def __init__(self, dataset):
         super().__init__(dataset)
 

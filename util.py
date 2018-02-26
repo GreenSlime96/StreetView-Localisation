@@ -1,5 +1,4 @@
 import glob
-import math
 import sys
 
 from os import path
@@ -9,18 +8,6 @@ import numpy as np
 # This allows for 100 angles per location should we need it
 SEPARATOR_MULTIPLIER = 100
 
-# In [28]: R = 6378137
-#     ...: x0 = y0 = None
-#     ...: for i in coordinates:
-#lat, lon = map(lambda x: math.radians(float(x)), i.split(','))
-#x = R * math.cos(lat) * math.cos(lon)
-#y = R * math.cos(lat) * math.sin(lon)
-# if not x0 and not y0:
-#    x0 = x
-#    y0 = y
-#print("{}\t{}".format(x0 - x, y0 - y))
-#     ...:
-
 
 class DataLoader(object):
     def __init__(self, folder):
@@ -29,16 +16,11 @@ class DataLoader(object):
         self.targets = np.load(
             path.join(folder, 'features_targ'), mmap_mode='r')
 
-        self.distances = np.zeros((len(self.coordinates), ) * 2)
-        self.min_dist = np.full(len(self.coordinates), np.inf)
+        self.distances = haversine(self.coordinates)
 
-        for i, c in enumerate(self.coordinates):
-            for j, d in enumerate(self.coordinates[i + 1:], i + 1):
-                dist = fast_distance(c, d)
-                self.distances[i][j] = self.distances[j][i] = dist
-
-                self.min_dist[i] = min(self.min_dist[i], dist)
-                self.min_dist[j] = min(self.min_dist[j], dist)
+        np.fill_diagonal(self.distances, np.inf)
+        self.min_dist = self.distances.min(axis=1)
+        np.fill_diagonal(self.distances, 0)
 
     def target2index(self, index):
         return np.searchsorted(self.targets, index, side='right')
@@ -76,8 +58,8 @@ def name_hash(filename):
 def load_coordinates(filename):
     if path.isfile(filename):
         with open(filename) as fd:
-            lines = fd.read().splitlines()
-            return [tuple(map(float, x.split(','))) for x in lines]
+            data = fd.read().replace(',', '\n').splitlines()
+            return np.fromiter(data, dtype=float).reshape(-1, 2)
     else:
         sys.exit('not a file: {}'.format(filename))
 
@@ -90,12 +72,22 @@ def load_images(directory):
         sys.exit('not a directory: {}'.format(directory))
 
 
-def fast_distance(c1, c2):
-    la1, lo1 = math.radians(c1[0]), math.radians(c1[1])
-    la2, lo2 = math.radians(c2[0]), math.radians(c2[1])
-    dlo = lo2 - lo1
-    dla = la2 - la1
-    a = math.sin(dla / 2)**2 + math.cos(la1) * \
-        math.cos(la2) * math.sin(dlo / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return 6371008 * c
+def haversine(x1, x2=None, r=6378137):
+    """
+    calculates haversine distance of 2 coordinate arrays
+
+    TODO: optimise calculation of square distance matrix?
+    we don't need to do N x N calculations...
+    """
+
+    x1 = np.deg2rad(x1)
+    x2 = x1[:, None] if x2 is None else np.deg2rad(x2)
+
+    dla = x1[..., 0] - x2[..., 0]
+    dlo = x1[..., 1] - x2[..., 1]
+
+    a = np.sin(dla * 0.5) ** 2 + np.cos(x1[..., 0]) * \
+        np.cos(x2[..., 0]) * np.sin(dlo * 0.5) ** 2
+    c = 2 * np.arcsin(np.sqrt(a))
+
+    return r * c

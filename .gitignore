@@ -102,3 +102,15 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# application specific
+data/test_videos
+data/test_set
+data/features_desc
+data/features_targ
+data/final.hnsw
+
+newdata/
+
+web/data
+web/data_
